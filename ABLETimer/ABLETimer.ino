@@ -1,9 +1,8 @@
 #include <ArduinoBLE.h>
 
-BLEService ledService("180A");//BLE LED Service
+BLEService ledService("19B10000-E8F2-537E-4F6C-D104768A1214");
 
-//BLE LED Switch characteristic 
-BLEByteCharacteristic switchCharacteristic("2A57", BLERead | BLEWrite);
+BLEByteCharacteristic switchCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
 
 void setup() {
   Serial.begin(9600);
@@ -14,69 +13,56 @@ void setup() {
     while(1);
   }
 
-  //set advertised local name and service UUID
-  BLE.setLocalName("Nano 33 IoT");
+  BLE.setLocalName("LED Callback");
+
   BLE.setAdvertisedService(ledService);
 
-  //add the characteristic to the service
   ledService.addCharacteristic(switchCharacteristic);
 
-  //add service
+  //add service(probably for ble callbacks)
   BLE.addService(ledService);
 
-  //initial value for charachteristic
-  switchCharacteristic.writeValue(0);
+  //functions for connection and disconnection callbacks
+  BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
+  BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
 
-  //start advertising
+  //function for written value
+  switchCharacteristic.setEventHandler(BLEWritten, switchCharacteristicWritten);
+
+  switchCharacteristic.setValue(0);
+
   BLE.advertise();
+
+  Serial.println("BLE Callback LED Peripheral");
 }
 
 void loop() {
-  //listen for BLE centrals to connect
-  BLEDevice central = BLE.central();
+  BLE.poll();
 
-  if (central) { //we have connection to central
-    Serial.print("Connected to central: ");
-    Serial.println(central.address());
+}
 
-    while(central.connected()) { //while loop to use the values to control LED
-      if (switchCharacteristic.written()) {
-        switch (switchCharacteristic.value()) {
-          case 01:
-            Serial.println("LED on");
-            digitalWrite(LED_BUILTIN, HIGH);
-            break;
-          case 02:
-            Serial.println("LED fast blink");
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(500);
-            digitalWrite(LED_BUILTIN, LOW);
-            delay(500);
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(500);
-            digitalWrite(LED_BUILTIN, LOW);
-            break;
-          case 03:
-            Serial.println("LED normal blink");
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(1000);
-            digitalWrite(LED_BUILTIN, LOW);
-            delay(1000);
-            digitalWrite(LED_BUILTIN, HIGH);
-            delay(1000);
-            digitalWrite(LED_BUILTIN, LOW);
-            break;
-          default:
-            Serial.println("LED off");
-            digitalWrite(LED_BUILTIN, LOW);
-            break;
-        }
-      }
-    }
+void blePeripheralConnectHandler(BLEDevice central) {
+  Serial.print("Connected event, central: ");
+  Serial.println(central.address());
+}
 
-    //when central disconnects...
-    Serial.print("Disconnected from central: ");
-    Serial.println(central.address());
+void blePeripheralDisconnectHandler(BLEDevice central) {
+  Serial.print("Disconnected event, central: ");
+  Serial.println(central.address());
+  digitalWrite(LED_BUILTIN, LOW);
+}
+
+void switchCharacteristicWritten (BLEDevice central, BLECharacteristic characteristic) {
+  //central wrote new value to characteristic, update LED
+  Serial.print("Characteristic event, written: ");
+
+  if (switchCharacteristic.value()) {
+    Serial.println("LED on");
+    digitalWrite(LED_BUILTIN, HIGH);
+  } else {
+    Serial.println("LED off");
     digitalWrite(LED_BUILTIN, LOW);
   }
 }
+
+
