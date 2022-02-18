@@ -4,10 +4,16 @@ BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 
 //changing value of led (ultimatly RGB led)
 BLEIntCharacteristic ledCharact("7c694001-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite);
-//sending raw accelerometr values
+//sending raw accelerometer values
 BLECharacteristic accelCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify, 12);
 //sending cube orientation (UP, DOWN, ...)
 BLEByteCharacteristic orientCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify);
+
+//buffer for central.connected()
+BLEDevice centralBuffor; 
+
+//buffors for deltas
+unsigned long previous=0;
 
 void setup() {
   Serial.begin(9600);
@@ -26,7 +32,6 @@ void setup() {
   bleService.addCharacteristic(accelCharact);
   bleService.addCharacteristic(orientCharact);
 
-  //add service(probably for ble callbacks)
   BLE.addService(bleService);
 
   //functions for connection and disconnection callbacks
@@ -45,12 +50,22 @@ void setup() {
 
   Serial.println("Cube timer peripheral");
 }
-
+int i=0;
 void loop() {
   BLE.poll();
+  while (centralBuffor.connected()) {
+    if (millis() - previous > 500) {
+      Serial.print("Cos sie dzieje");
+      Serial.println(++i);
+      orientCharact.writeValue(i); // max number to send is 255, then overflow
+      previous = millis();
+    }
+    BLE.poll();
+  }
 }
 
 void connectionCallback (BLEDevice central) {
+  centralBuffor = central;
   Serial.println("Connected");
 }
 
