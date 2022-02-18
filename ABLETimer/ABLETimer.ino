@@ -1,8 +1,13 @@
 #include <ArduinoBLE.h>
 
-BLEService ledService("19B10000-E8F2-537E-4F6C-D104768A1214");
+BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 
-BLEByteCharacteristic switchCharacteristic("19B10001-E8F2-537E-4F6C-D104768A1214", BLERead | BLEWrite);
+//changing value of led (ultimatly RGB led)
+BLEIntCharacteristic ledCharact("7c694001-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite);
+//sending raw accelerometr values
+BLECharacteristic accelCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify, 12);
+//sending cube orientation (UP, DOWN, ...)
+BLEByteCharacteristic orientCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify);
 
 void setup() {
   Serial.begin(9600);
@@ -12,57 +17,47 @@ void setup() {
     Serial.println("Starting BLE failed");
     while(1);
   }
+  //set uuid to connect and name diplayed in bluetooth pairing 
+  BLE.setLocalName("Cube timer");
+  BLE.setAdvertisedService(bleService);
 
-  BLE.setLocalName("LED Callback");
-
-  BLE.setAdvertisedService(ledService);
-
-  ledService.addCharacteristic(switchCharacteristic);
+  //add charachterics to send and recive values
+  bleService.addCharacteristic(ledCharact);
+  bleService.addCharacteristic(accelCharact);
+  bleService.addCharacteristic(orientCharact);
 
   //add service(probably for ble callbacks)
-  BLE.addService(ledService);
+  BLE.addService(bleService);
 
   //functions for connection and disconnection callbacks
-  BLE.setEventHandler(BLEConnected, blePeripheralConnectHandler);
-  BLE.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
+  BLE.setEventHandler(BLEConnected, connectionCallback);
+  BLE.setEventHandler(BLEDisconnected, disconnectionCallback);
 
-  //function for written value
-  switchCharacteristic.setEventHandler(BLEWritten, switchCharacteristicWritten);
+  //function for written value callbacks
+  ledCharact.setEventHandler(BLEWritten, ledCharactWritten);
 
-  switchCharacteristic.setValue(0);
+  //initialize starting values
+  ledCharact.writeValue(3); //setValue deprecated
+  accelCharact.writeValue((uint8_t)5);
+  orientCharact.writeValue(10);
 
   BLE.advertise();
 
-  Serial.println("BLE Callback LED Peripheral");
+  Serial.println("Cube timer peripheral");
 }
 
 void loop() {
   BLE.poll();
-
 }
 
-void blePeripheralConnectHandler(BLEDevice central) {
-  Serial.print("Connected event, central: ");
-  Serial.println(central.address());
+void connectionCallback (BLEDevice central) {
+  Serial.println("Connected");
 }
 
-void blePeripheralDisconnectHandler(BLEDevice central) {
-  Serial.print("Disconnected event, central: ");
-  Serial.println(central.address());
-  digitalWrite(LED_BUILTIN, LOW);
+void disconnectionCallback (BLEDevice central) {
+  Serial.println("Disconnected");
 }
 
-void switchCharacteristicWritten (BLEDevice central, BLECharacteristic characteristic) {
-  //central wrote new value to characteristic, update LED
-  Serial.print("Characteristic event, written: ");
-
-  if (switchCharacteristic.value()) {
-    Serial.println("LED on");
-    digitalWrite(LED_BUILTIN, HIGH);
-  } else {
-    Serial.println("LED off");
-    digitalWrite(LED_BUILTIN, LOW);
-  }
+void ledCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
+  Serial.println("LED written");
 }
-
-
