@@ -1,4 +1,5 @@
 #include <ArduinoBLE.h>
+#include "TimerLib.h"
 
 BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 
@@ -12,17 +13,28 @@ BLEByteCharacteristic orientCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLER
 //buffer for central.connected()
 BLEDevice centralBuffor; 
 
-//buffors for deltas
+//buffers for deltas
 unsigned long previous=0;
+
+//IMU definition of herited class LSM6DS3Class
+Accelerometer MyIMU;
 
 void setup() {
   Serial.begin(9600);
   pinMode(LED_BUILTIN, OUTPUT);
 
+  //initialize ble
   if (!BLE.begin()) {
     Serial.println("Starting BLE failed");
     while(1);
   }
+
+  //initialize IMU  
+  if (!MyIMU.begin()) {
+    Serial.println("Failed to initialize IMU!");
+    while (1);
+  }
+  
   //set uuid to connect and name diplayed in bluetooth pairing 
   BLE.setLocalName("Cube timer");
   BLE.setAdvertisedService(bleService);
@@ -53,6 +65,11 @@ void setup() {
 int i=0;
 void loop() {
   BLE.poll();
+  
+  //read acceleration vaues and display them via Serial
+  MyIMU.readAcceleration();
+  MyIMU.showPos();
+  
   while (centralBuffor.connected()) {
     if (millis() - previous > 500) {
       Serial.print("Cos sie dzieje");
