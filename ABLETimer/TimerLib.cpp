@@ -2,28 +2,13 @@
 #include <Arduino.h>
 
 Orientator::Orientator()
-:LSM6DS3Class(Wire, 0x6A) //LSM6DS3_ADDRESS defined in LSM6DS3.cpp
-{
-
-}
-
-void Orientator::showPos() {
-  Serial.begin(9600);
-  String buffer="X: ";
-  buffer.concat(xPos);
-  buffer.concat(" Y: ");
-  buffer.concat(yPos);
-  buffer.concat(" Z: ");
-  buffer.concat(zPos);
-  Serial.println(buffer);
-  Serial.end();
-}
+:LSM6DS3Class(Wire, 0x6A){} //LSM6DS3_ADDRESS defined in LSM6DS3.cpp
 
 void Orientator::readAcceleration() {
   LSM6DS3Class::readAcceleration(xPos, yPos, zPos);
 }
 
-void OrientatorManager::quantize() {
+void Orientator::quantize() {
   stabilizedOrient = true;
   if ( xPos >= quantHighMin && xPos <= quantHighMax)   xLogic = 1;
   else if ( xPos >= -quantHighMax && xPos <= -quantHighMin) xLogic =-1;
@@ -50,7 +35,12 @@ void OrientatorManager::quantize() {
   }
 }
 
-uint8_t OrientatorManager::checkOrientation() {
+void Orientator::readOrientation() {
+  Orientator::readAcceleration();
+  Orientator::quantize();
+}
+
+uint8_t Orientator::checkOrientation() {
   if      (xLogic == 1 && yLogic == 0 && zLogic == 0 && stabilizedOrient == true) {
     position = FRONT;
     return     FRONT;
@@ -83,6 +73,24 @@ uint8_t OrientatorManager::checkOrientation() {
   }
 }
 
-/*bool OrientatorManager::compare(Accelerometer acc) {
-  this->xPos;
-}*/
+String Orientator::concatRawPos() {
+  String buffer="X: ";
+  buffer.concat(xPos);
+  buffer.concat(" Y: ");
+  buffer.concat(yPos);
+  buffer.concat(" Z: ");
+  buffer.concat(zPos);
+  
+  return buffer;
+}
+
+String Orientator::concatLogicPos() {
+  String buffer="X: ";
+  buffer.concat(xLogic);
+  buffer.concat(" Y: ");
+  buffer.concat(yLogic);
+  buffer.concat(" Z: ");
+  buffer.concat(zLogic);
+  
+  return buffer;
+}

@@ -70,15 +70,10 @@ void loop() {
   
   while (centralBuffor.connected()) {
     if (millis() - previous > 50) {
-      MyIMU.readAcceleration();
-      MyIMU.showPos();
-      MyIMU.quantize();
+      MyIMU.readOrientation();
+      Serial.println(MyIMU.concatRawPos());
+      Serial.println(MyIMU.concatLogicPos());
 
-      Serial.print(MyIMU.getXLogic());
-      Serial.print("\t");
-      Serial.print(MyIMU.getYLogic());
-      Serial.print("\t");
-      Serial.println(MyIMU.getZLogic());
       switch (MyIMU.checkOrientation()) {
         case UP:
           Serial.println("UP");
@@ -109,16 +104,6 @@ void loop() {
           accelCharact.writeValue("UNDEFINED");
         break;
       }
-
-      /*bufferStr="X:";
-      bufferStr.concat(MyIMU.getX());
-      bufferStr.concat("Y:");
-      bufferStr.concat(MyIMU.getY());
-      bufferStr.concat("Z:");
-      bufferStr.concat(MyIMU.getZ());
-
-      accelCharact.writeValue(bufferStr.c_str());*/
-
       previous = millis();
     }
     BLE.poll();

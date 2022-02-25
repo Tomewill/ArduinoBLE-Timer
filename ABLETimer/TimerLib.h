@@ -13,17 +13,18 @@ enum CubeOrient { //on which side borad/cube is laying
   RIGHT = 5,
   UNDEFINED = 6
 };
-class Orientator; 
-class OrientatorManager;
 
-class OrientatorManager { // !!!!!!!!!!! POMYSLEC CZY NIE USUNAC OrientatorManager I PRZECHOWYWAC OSTATNI STAN PLYTKI W ZMIENNEJ -> BEZSENSOWNE KOMPLIKOWANIE KODU  --  zajac sie dokumentacja (dodac png plytki z opisem, opisy, opis github itp)
+class Orientator : public LSM6DS3Class {
 public:
-  void quantize(); // change *Pos to 1, -1, 0 logic and save it in *Logic; returns 2 when values are between (quantLow;quantHighLow),that means board/cube is not in desired position
-  
-  uint8_t checkOrientation(); //return value from CubeOrient enum under proper conditions
+  Orientator(void); // initialize LSM6DS3
 
-  bool compare(Orientator);
-  bool compare(OrientatorManager);// !!!!!!!!!!!!!!!!!!!! DO WYWALENIA
+  void readAcceleration(void); //read values form IMU and save it in *Pos
+
+  void quantize(void); // change *Pos to 1, -1, 0 logic and save it in *Logic; returns 2 when values are between (quantLow;quantHighLow), that means board/cube is not in desired position
+
+  void readOrientation(void); //readAcceleration() and quantize() in one function
+  
+  uint8_t checkOrientation(void); //return value from CubeOrient enum under proper conditions;
 
   float getX() {return xPos;}
   float getY() {return yPos;}
@@ -33,28 +34,24 @@ public:
   int8_t getYLogic() {return yLogic;}
   int8_t getZLogic() {return zLogic;}
   uint8_t getPosition() {return position;}
-  
-protected:
+
+  String concatRawPos(void); //display accelerometer values in one string
+  String concatLogicPos(void); //display accelerometer values
+
+private:
+  //raw data
   float xPos, yPos, zPos;
 
+  //0 1 logic data
   const float quantHighMin=0.75, quantHighMax=1.25; // quantisation intervals 
   const float quantLow=0.25;
-  bool stabilizedOrient;
+  //if any axis is between quantLow and quantHighMin, then cube position isn't in desired posiotion
+
+  bool stabilizedOrient; //is board/cube in predefined positions CubeOrient
 
   int8_t xLogic, yLogic, zLogic;
   
   uint8_t position;
-};
-
-class Orientator : public LSM6DS3Class, public OrientatorManager{
-public:
-  Orientator();
-
-  void showPos(); //display accelerometer values via Serial
-  
-
-  void readAcceleration(); 
-  
 };
 
 #endif //_TIMERLIB_H_
