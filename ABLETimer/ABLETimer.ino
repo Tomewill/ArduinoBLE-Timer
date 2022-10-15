@@ -6,15 +6,18 @@ BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 //changing value of led (ultimatly RGB led)
 BLEIntCharacteristic ledCharact("7c694001-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite);
 //sending raw accelerometer values
-BLECharacteristic accelCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify, 64);
+BLECharacteristic accelCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 64);
+//sending cube orientation (0, 1, ...)
+BLEByteCharacteristic orientCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLENotify);
 //sending cube orientation (UP, DOWN, ...)
-BLEByteCharacteristic orientCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify);
+BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 10);
 
 //buffer for central.connected()
 BLEDevice centralBuffor; 
 
 //buffers for deltas
-unsigned long previous=0;
+unsigned long previousRaw=0;
+unsigned long previousOrient=0;
 
 //IMU definition of herited class LSM6DS3Class
 Orientator MyIMU;
@@ -43,6 +46,7 @@ void setup() {
   bleService.addCharacteristic(ledCharact);
   bleService.addCharacteristic(accelCharact);
   bleService.addCharacteristic(orientCharact);
+  bleService.addCharacteristic(orientDescription);
 
   BLE.addService(bleService);
 
@@ -54,9 +58,10 @@ void setup() {
   ledCharact.setEventHandler(BLEWritten, ledCharactWritten);
 
   //initialize starting values
-  ledCharact.writeValue(3); //setValue deprecated
-  accelCharact.writeValue((uint8_t)5);
-  orientCharact.writeValue(10);
+  ledCharact.writeValue(0x1fcba03); //setValue deprecated
+  accelCharact.writeValue("Accel values");
+  orientCharact.writeValue(UNDEFINED);
+  orientDescription.writeValue("Side");
 
   BLE.advertise();
 
@@ -69,42 +74,25 @@ void loop() {
   BLE.poll();
   
   while (centralBuffor.connected()) {
-    if (millis() - previous > 50) {
+    //check if MyIMU is needed
+    /*if (accelCharact.subscribed() || orientCharact.subscribed() || orientDescription.subscribed()) {
       MyIMU.readOrientation();
       Serial.println(MyIMU.concatRawPos());
       Serial.println(MyIMU.concatLogicPos());
+    }*/
 
-      switch (MyIMU.checkOrientation()) {
-        case UP:
-          Serial.println("UP");
-          accelCharact.writeValue("UP");
-        break;
-        case DOWN:
-          Serial.println("DOWN");
-          accelCharact.writeValue("DOWN");
-        break;
-        case RIGHT:
-          Serial.println("RIGHT");
-          accelCharact.writeValue("RIGHT");
-        break;
-        case LEFT:
-          Serial.println("LEFT");
-          accelCharact.writeValue("LEFT");
-        break;
-        case BACK:
-          Serial.println("BACK");
-          accelCharact.writeValue("BACK");
-        break;
-        case FRONT:
-          Serial.println("FRONT");
-          accelCharact.writeValue("FRONT");
-        break;
-        case UNDEFINED:
-          Serial.println("UNDEFINED");
-          accelCharact.writeValue("UNDEFINED");
-        break;
-      }
-      previous = millis();
+    //send raw accelerometer values if subscribed
+
+    //send cube orientation (0, 1, ...) if subscribed
+
+    //send cube orientation (UP, DOWN, ...) if subscribed
+    if (orientDescription.subscribed() && (millis() - previousOrient > 50)) {
+      MyIMU.readOrientation();
+      MyIMU.checkOrientation();
+      String value = MyIMU.positionToEnumStr();
+      Serial.println(value);
+      orientDescription.writeValue(value.c_str());
+      previousOrient = millis();
     }
     BLE.poll();
   }
@@ -117,8 +105,11 @@ void connectionCallback (BLEDevice central) {
 
 void disconnectionCallback (BLEDevice central) {
   Serial.println("Disconnected");
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 void ledCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
   Serial.println("LED written");
+  if (ledCharact.value()>0) digitalWrite(LED_BUILTIN, HIGH);
+  else digitalWrite(LED_BUILTIN, LOW);
 }
