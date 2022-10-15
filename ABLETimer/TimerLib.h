@@ -35,8 +35,9 @@ public:
   int8_t getZLogic() {return zLogic;}
   uint8_t getPosition() {return position;}
 
-  String concatRawPos(void); //display accelerometer values in one string
-  String concatLogicPos(void); //display accelerometer values
+  String concatRawPos(void); //return raw accelerometer values in one string
+  String concatLogicPos(void); //return logic accelerometer values in one string
+  String positionToEnumStr(void); //return (UP, DOWN, ...)
 
 private:
   //raw data

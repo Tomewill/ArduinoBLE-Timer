@@ -94,3 +94,29 @@ String Orientator::concatLogicPos() {
   
   return buffer;
 }
+
+String Orientator::positionToEnumStr() {
+  switch (position) {
+        case UP:
+          return "UP";
+        break;
+        case DOWN:
+          return "DOWN";
+        break;
+        case RIGHT:
+          return "RIGHT";
+        break;
+        case LEFT:
+          return "LEFT";
+        break;
+        case BACK:
+          return "BACK";
+        break;
+        case FRONT:
+          return "FRONT";
+        break;
+        case UNDEFINED:
+          return "UNDEFINED";
+        break;
+  }
+}
