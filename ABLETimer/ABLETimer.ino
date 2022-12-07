@@ -16,8 +16,9 @@ BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLEN
 BLEDevice centralBuffor; 
 
 //buffers for deltas
-unsigned long previousRaw=0;
-unsigned long previousOrient=0;
+unsigned long previousSendingTime=0;
+unsigned long previousOrientTime=0;
+
 
 //IMU definition of herited class LSM6DS3Class
 Orientator MyIMU;
@@ -68,33 +69,72 @@ void setup() {
   Serial.println("Cube timer peripheral");
 }
 
-String bufferStr;
+unsigned long timeUP=0;
+unsigned long timeDOWN=0;
+unsigned long timeLEFT=0;
+unsigned long timeRIGHT=0;
+unsigned long timeFRONT=0;
+unsigned long timeBACK=0;
 
 void loop() {
   BLE.poll();
-  
-  while (centralBuffor.connected()) {
-    //check if MyIMU is needed
-    /*if (accelCharact.subscribed() || orientCharact.subscribed() || orientDescription.subscribed()) {
+
+  if (millis() - previousOrientTime > 100) {
+      
       MyIMU.readOrientation();
-      Serial.println(MyIMU.concatRawPos());
-      Serial.println(MyIMU.concatLogicPos());
-    }*/
 
-    //send raw accelerometer values if subscribed
-
-    //send cube orientation (0, 1, ...) if subscribed
-
-    //send cube orientation (UP, DOWN, ...) if subscribed
-    if (orientDescription.subscribed() && (millis() - previousOrient > 50)) {
-      MyIMU.readOrientation();
-      MyIMU.checkOrientation();
-      String value = MyIMU.positionToEnumStr();
-      Serial.println(value);
-      orientDescription.writeValue(value.c_str());
-      previousOrient = millis();
+      uint8_t sideInInt = MyIMU.checkOrientation();
+      switch(sideInInt) {
+        case UP:
+          timeUP += 100;
+          break;
+        case DOWN:
+          timeDOWN += 100;
+          break;
+        case LEFT:
+          timeLEFT += 100;
+          break;
+        case RIGHT:
+          timeRIGHT += 100;
+          break;
+        case FRONT:
+          timeFRONT += 100;
+          break;
+        case BACK:
+          timeBACK += 100;
+          break;
+      }
+      
+      previousOrientTime = millis();
     }
-    BLE.poll();
+  
+  if (centralBuffor.connected()) {
+    if (millis() - previousSendingTime > 1000){
+      if (accelCharact.subscribed()) {
+        String time="";
+        time.concat(timeUP);
+        time.concat(' ');
+        time.concat(timeDOWN);
+        time.concat(' ');
+        time.concat(timeLEFT);
+        time.concat(' ');
+        time.concat(timeRIGHT);
+        time.concat(' ');
+        time.concat(timeFRONT);
+        time.concat(' ');
+        time.concat(timeBACK);
+        accelCharact.writeValue(time.c_str());
+        
+      }
+      if (orientDescription) {
+        MyIMU.readOrientation();
+        MyIMU.checkOrientation();
+        String value = MyIMU.positionToEnumStr();
+        Serial.println(value);
+        orientDescription.writeValue(value.c_str());
+      }
+      previousSendingTime = millis();
+    }
   }
 }
 
@@ -109,7 +149,9 @@ void disconnectionCallback (BLEDevice central) {
 }
 
 void ledCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
-  Serial.println("LED written");
-  if (ledCharact.value()>0) digitalWrite(LED_BUILTIN, HIGH);
-  else digitalWrite(LED_BUILTIN, LOW);
+  if (ledCharact.written()) {
+    Serial.println("LED written");
+    if (ledCharact.value()>0) digitalWrite(LED_BUILTIN, HIGH);
+    else digitalWrite(LED_BUILTIN, LOW);
+  }
 }
