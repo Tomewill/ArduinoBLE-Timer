@@ -120,3 +120,7 @@ String Orientator::positionToEnumStr() {
         break;
   }
 }
+
+ColorSystem::ColorSystem(uint8_t pin, uint8_t numpixels){
+  
+}

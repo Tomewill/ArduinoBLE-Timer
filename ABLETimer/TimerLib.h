@@ -2,6 +2,7 @@
 #define _TIMERLIB_H_
 
 #include <LSM6DS3.h>
+#include <Adafruit_NeoPixel.h>
 
 
 enum CubeOrient { //on which side borad/cube is laying
@@ -53,6 +54,20 @@ private:
   int8_t xLogic, yLogic, zLogic;
   
   uint8_t position;
+};
+
+class ColorSystem {
+public:
+  ColorSystem(uint8_t, uint8_t);
+  // void HSVtoRGB;
+  // void RGBtoHSV;
+  Adafruit_NeoPixel pixels;
+
+private:
+  uint8_t redVal, greenVal, blueVal;
+  unsigned long speedInterval;
+  unsigned long lastSpeedTime;
+
 };
 
 #endif //_TIMERLIB_H_
