@@ -3,16 +3,28 @@
 
 #include <LSM6DS3.h>
 #include <Adafruit_NeoPixel.h>
-
+#include <SPI.h>
+#include <SD.h>
+#include <DS3231.h>
+#include <Wire.h>
 
 enum CubeOrient { //on which side borad/cube is laying
   UP    = 0, //board where reset and LEDs are seen
   DOWN  = 1,
-  FRONT = 2,
-  BACK  = 3, //board where USB port is seen
-  LEFT  = 4,
-  RIGHT = 5,
+  LEFT  = 2,
+  RIGHT = 3,
+  FRONT = 4,
+  BACK  = 5, //board where USB port is seen
   UNDEFINED = 6
+};
+
+struct SecondsOn{
+  long up;
+  long down;
+  long left;
+  long right;
+  long front;
+  long back;
 };
 
 class Orientator : public LSM6DS3Class {
@@ -45,7 +57,7 @@ private:
   float xPos, yPos, zPos;
 
   //0 1 logic data
-  const float quantHighMin=0.75, quantHighMax=1.25; // quantisation intervals 
+  const float quantHighMin=0.75, quantHighMax=1.25; //quantisation intervals 
   const float quantLow=0.25;
   //if any axis is between quantLow and quantHighMin, then cube position isn't in desired posiotion
 
@@ -69,5 +81,10 @@ private:
   unsigned long lastSpeedTime;
 
 };
+
+void getFileName(char* filename, DateTime now); //return filename in parameter
+bool writeToFile(char* fileName, SecondsOn sideTimeOn);
+SecondsOn readConfig(char* fileName);
+
 
 #endif //_TIMERLIB_H_
