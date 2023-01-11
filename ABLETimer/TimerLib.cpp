@@ -124,3 +124,74 @@ String Orientator::positionToEnumStr() {
 ColorSystem::ColorSystem(uint8_t pin, uint8_t numpixels){
   
 }
+
+void getFileName(char* filename, DateTime now) {
+  String line;
+  line.reserve(12);
+  line = String(now.year());
+  uint8_t n = now.month();
+  if (n<10) line += '0';
+  line += String(n);
+  n = now.day();
+  if (n<10) line += '0';
+  line += String(n);
+  line += ".dat";
+  line.toCharArray(filename, line.length() + 1);
+  Serial.println(filename);
+}
+
+bool writeToFile(char* fileName, SecondsOn sideTimeOn) {
+  File save = SD.open(fileName, (FILE_WRITE | O_TRUNC));  //override file 
+  save.print("header;");save.println(fileName);
+  save.print("U;");save.println(sideTimeOn.up);
+  save.print("D;");save.println(sideTimeOn.down);
+  save.print("L;");save.println(sideTimeOn.left);
+  save.print("R;");save.println(sideTimeOn.right);
+  save.print("F;");save.println(sideTimeOn.front);
+  save.print("B;");save.print(sideTimeOn.back);
+  save.close();
+  return true;
+}
+
+SecondsOn readConfig(char* fileName) {
+  SecondsOn timeTmp;
+  String tmp;
+  tmp.reserve(80);
+  
+  File file = SD.open(fileName, FILE_READ);
+  Serial.println(file.name());
+  while(file.available()){
+    char ch = file.read();
+    tmp += ch;
+  }
+  file.close();
+
+  const uint8_t DATA_SEP_NUM = 6;
+  char separ = '\n';
+	uint8_t encounteredSep = 0;
+	uint8_t i = 1, startPos = 0;  // iterator over string
+	uint8_t lastIdx = tmp.length() - 1;
+	
+	String tempData[DATA_SEP_NUM+1] = {"1", "2", "3", "4", "5", "6", "7"};
+	
+	while (encounteredSep < DATA_SEP_NUM && i <= lastIdx) {  
+		if (tmp[i] == separ) {
+			tempData[encounteredSep] = tmp.substring(startPos,i);
+			startPos = i + 1;
+			encounteredSep++;
+			i++;
+		}
+		i++;
+	}
+	i--;
+	tempData[encounteredSep] = tmp.substring(i);
+  
+  timeTmp.up    = tempData[1].substring(2).toInt();
+  timeTmp.down  = tempData[2].substring(2).toInt();
+  timeTmp.left  = tempData[3].substring(2).toInt();
+  timeTmp.right = tempData[4].substring(2).toInt();
+  timeTmp.front = tempData[5].substring(2).toInt();
+  timeTmp.back  = tempData[6].substring(2).toInt();
+  
+  return timeTmp;
+}
