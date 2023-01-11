@@ -1,5 +1,11 @@
 #include <ArduinoBLE.h>
+#include <Wire.h>
+#include <DS3231.h>
+#include <SPI.h>
+#include <SD.h>
 #include "TimerLib.h"
+
+#define SPI_CS_PIN 4
 
 BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 
@@ -11,25 +17,30 @@ BLECharacteristic accelCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLENotify
 BLEByteCharacteristic orientCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLENotify);
 //sending cube orientation (UP, DOWN, ...)
 BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 10);
-
 //buffer for central.connected()
 BLEDevice centralBuffor; 
+//IMU definition of herited class LSM6DS3Class
+Orientator MyIMU;
 
 //buffers for deltas
 unsigned long previousSendingTime=0;
 unsigned long previousOrientTime=0;
 
-
-//IMU definition of herited class LSM6DS3Class
-Orientator MyIMU;
+SecondsOn secondsOn;
+RTClib myRTC;
+DateTime now;
+char filename[12]; // 11 chars and \0
 
 void setup() {
   Serial.begin(9600);
+  while(!Serial);
+  delay(200);
+  Serial.println("CONFIGURATION STARTED");
   pinMode(LED_BUILTIN, OUTPUT);
 
-  //initialize ble
+  //initialize BLE
   if (!BLE.begin()) {
-    Serial.println("Starting BLE failed");
+    Serial.println("Failed to initialize BLE!");
     while(1);
   }
 
@@ -38,6 +49,29 @@ void setup() {
     Serial.println("Failed to initialize IMU!");
     while (1);
   }
+
+  //initalize RTC
+  Wire.begin();
+  now = myRTC.now();
+  getFileName(filename, now); //filename modified in parameter
+
+  //initialize SD
+  if (!SD.begin(SPI_CS_PIN)) {
+    Serial.println("Failed to initialize SD!");
+    while (1);
+  }
+  if (SD.exists(filename)) {
+    Serial.println("Reading config");
+    secondsOn = readConfig(filename);
+  } else {
+    Serial.println("File doesn't exist");
+  }
+  Serial.println(secondsOn.up);
+  Serial.println(secondsOn.down);
+  Serial.println(secondsOn.left);
+  Serial.println(secondsOn.right);
+  Serial.println(secondsOn.front);
+  Serial.println(secondsOn.back);
   
   //set uuid to connect and name diplayed in bluetooth pairing 
   BLE.setLocalName("Cube timer");
@@ -66,45 +100,36 @@ void setup() {
 
   BLE.advertise();
 
-  Serial.println("Cube timer peripheral");
+  Serial.println("CONFIGURATION COMPLITED");
 }
 
-unsigned long timeUP=0;
-unsigned long timeDOWN=0;
-unsigned long timeLEFT=0;
-unsigned long timeRIGHT=0;
-unsigned long timeFRONT=0;
-unsigned long timeBACK=0;
 
 void loop() {
   BLE.poll();
 
-  if (millis() - previousOrientTime > 100) {
-      
+  if (millis() - previousOrientTime > 500) {
       MyIMU.readOrientation();
-
       uint8_t sideInInt = MyIMU.checkOrientation();
       switch(sideInInt) {
         case UP:
-          timeUP += 100;
+          secondsOn.up += 500;
           break;
         case DOWN:
-          timeDOWN += 100;
+          secondsOn.down += 500;
           break;
         case LEFT:
-          timeLEFT += 100;
+          secondsOn.left += 500;
           break;
         case RIGHT:
-          timeRIGHT += 100;
+          secondsOn.right += 500;
           break;
         case FRONT:
-          timeFRONT += 100;
+          secondsOn.front += 500;
           break;
         case BACK:
-          timeBACK += 100;
+          secondsOn.back += 500;
           break;
       }
-      
       previousOrientTime = millis();
     }
   
@@ -112,17 +137,17 @@ void loop() {
     if (millis() - previousSendingTime > 1000){
       if (accelCharact.subscribed()) {
         String time="";
-        time.concat(timeUP);
+        time.concat(secondsOn.up/1000);
         time.concat(' ');
-        time.concat(timeDOWN);
+        time.concat(secondsOn.down/1000);
         time.concat(' ');
-        time.concat(timeLEFT);
+        time.concat(secondsOn.left/1000);
         time.concat(' ');
-        time.concat(timeRIGHT);
+        time.concat(secondsOn.right/1000);
         time.concat(' ');
-        time.concat(timeFRONT);
+        time.concat(secondsOn.front/1000);
         time.concat(' ');
-        time.concat(timeBACK);
+        time.concat(secondsOn.back/1000);
         accelCharact.writeValue(time.c_str());
         
       }
