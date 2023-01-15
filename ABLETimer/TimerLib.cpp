@@ -125,9 +125,9 @@ ColorSystem::ColorSystem(uint8_t pin, uint8_t numpixels){
   
 }
 
-void getFileName(char* filename, DateTime now) {
+void createFileName(char* filename, DateTime now) {
   String line;
-  line.reserve(12);
+  line.reserve(13);
   line = String(now.year());
   uint8_t n = now.month();
   if (n<10) line += '0';
@@ -142,15 +142,24 @@ void getFileName(char* filename, DateTime now) {
 
 bool writeToFile(char* fileName, SecondsOn sideTimeOn) {
   File save = SD.open(fileName, (FILE_WRITE | O_TRUNC));  //override file 
-  save.print("header;");save.println(fileName);
-  save.print("U;");save.println(sideTimeOn.up);
-  save.print("D;");save.println(sideTimeOn.down);
-  save.print("L;");save.println(sideTimeOn.left);
-  save.print("R;");save.println(sideTimeOn.right);
-  save.print("F;");save.println(sideTimeOn.front);
-  save.print("B;");save.print(sideTimeOn.back);
+  //if (save) {
+    char date[10];
+    for (uint8_t i=0; i<4;i++) date[i]=fileName[i]; //create properly formated timestamp
+    for (uint8_t i=5; i<7;i++) date[i]=fileName[i-1];
+    for (uint8_t i=8; i<10;i++) date[i]=fileName[i-1];
+    date[4]='-';date[7]='-';
+    save.print("header;");save.println(date);
+    save.print("U;");save.println(sideTimeOn.up);
+    save.print("D;");save.println(sideTimeOn.down);
+    save.print("L;");save.println(sideTimeOn.left);
+    save.print("R;");save.println(sideTimeOn.right);
+    save.print("F;");save.println(sideTimeOn.front);
+    save.print("B;");save.print(sideTimeOn.back);
+    save.close();
+    return true;
+  //}
   save.close();
-  return true;
+  return false;
 }
 
 SecondsOn readConfig(char* fileName) {

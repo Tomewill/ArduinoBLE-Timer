@@ -19,12 +19,12 @@ enum CubeOrient { //on which side borad/cube is laying
 };
 
 struct SecondsOn{
-  long up;
-  long down;
-  long left;
-  long right;
-  long front;
-  long back;
+  unsigned long up;
+  unsigned long down;
+  unsigned long left;
+  unsigned long right;
+  unsigned long front;
+  unsigned long back;
 };
 
 class Orientator : public LSM6DS3Class {
@@ -82,7 +82,7 @@ private:
 
 };
 
-void getFileName(char* filename, DateTime now); //return filename in parameter
+void createFileName(char* filename, DateTime now); //return filename in parameter
 bool writeToFile(char* fileName, SecondsOn sideTimeOn);
 SecondsOn readConfig(char* fileName);
 
