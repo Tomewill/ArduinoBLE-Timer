@@ -29,7 +29,9 @@ unsigned long previousOrientTime=0;
 SecondsOn secondsOn;
 RTClib myRTC;
 DateTime now;
-char filename[12]; // 11 chars and \0
+char filename[12]; // 12 chars without \0 
+uint8_t actualState, previousState; //initialization in setup
+unsigned long actualTimeStamp, previousTimeStamp; 
 
 void setup() {
   Serial.begin(9600);
@@ -49,11 +51,16 @@ void setup() {
     Serial.println("Failed to initialize IMU!");
     while (1);
   }
+  MyIMU.readOrientation();
+  actualState = MyIMU.checkOrientation();
+  previousState = -1;
 
   //initalize RTC
   Wire.begin();
   now = myRTC.now();
-  getFileName(filename, now); //filename modified in parameter
+  createFileName(filename, now); //filename modified in parameter
+  actualTimeStamp = now.unixtime();
+  previousTimeStamp = actualTimeStamp;
 
   //initialize SD
   if (!SD.begin(SPI_CS_PIN)) {
@@ -95,7 +102,7 @@ void setup() {
   //initialize starting values
   ledCharact.writeValue(0x1fcba03); //setValue deprecated
   accelCharact.writeValue("Accel values");
-  orientCharact.writeValue(UNDEFINED);
+  orientCharact.writeValue(MyIMU.getPosition());
   orientDescription.writeValue("Side");
 
   BLE.advertise();
@@ -107,34 +114,46 @@ void setup() {
 void loop() {
   BLE.poll();
 
-  if (millis() - previousOrientTime > 500) {
-      MyIMU.readOrientation();
-      uint8_t sideInInt = MyIMU.checkOrientation();
-      switch(sideInInt) {
+  //counting time
+  if (millis() - previousOrientTime > 500UL) {
+    MyIMU.readOrientation();
+    actualState = MyIMU.checkOrientation();
+    if (actualState != UNDEFINED && actualState != previousState) {
+      now = myRTC.now();
+      actualTimeStamp = now.unixtime();
+      unsigned long delta = actualTimeStamp - previousTimeStamp;
+      switch(previousState) {
         case UP:
-          secondsOn.up += 500;
+          secondsOn.up += delta;
           break;
         case DOWN:
-          secondsOn.down += 500;
+          secondsOn.down += delta;
           break;
         case LEFT:
-          secondsOn.left += 500;
+          secondsOn.left += delta;
           break;
         case RIGHT:
-          secondsOn.right += 500;
+          secondsOn.right += delta;
           break;
         case FRONT:
-          secondsOn.front += 500;
+          secondsOn.front += delta;
           break;
         case BACK:
-          secondsOn.back += 500;
+          secondsOn.back += delta;
           break;
       }
-      previousOrientTime = millis();
+      if (writeToFile(filename, secondsOn)) {
+        Serial.println("Wrote to file succesfully");
+      } else Serial.println("Failed to write to file");
+      previousTimeStamp = actualTimeStamp;
+      previousState = actualState; //write to file after changing side
     }
+    previousOrientTime = millis();
+  }
+
   
   if (centralBuffor.connected()) {
-    if (millis() - previousSendingTime > 1000){
+    if (millis() - previousSendingTime > 1000UL){
       if (accelCharact.subscribed()) {
         String time="";
         time.concat(secondsOn.up/1000);
@@ -149,8 +168,8 @@ void loop() {
         time.concat(' ');
         time.concat(secondsOn.back/1000);
         accelCharact.writeValue(time.c_str());
-        
       }
+
       if (orientDescription) {
         MyIMU.readOrientation();
         MyIMU.checkOrientation();
