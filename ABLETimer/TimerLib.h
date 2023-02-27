@@ -84,7 +84,8 @@ private:
 
 void createFileName(char* filename, DateTime now); //return filename in parameter
 bool writeToFile(char* fileName, SecondsOn sideTimeOn);
-SecondsOn readConfig(char* fileName);
+void readConfig(SecondsOn &timeTmp, char* fileName);
+bool readValuesToSend(char *values, char* fileName);
 
 
 #endif //_TIMERLIB_H_
