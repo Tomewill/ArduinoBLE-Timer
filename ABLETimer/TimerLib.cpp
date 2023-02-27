@@ -1,5 +1,10 @@
 #include "TimerLib.h"
 #include <Arduino.h>
+#include <string.h>
+#include <vector>
+#include <algorithm>
+
+using strVec = std::vector<String>;
 
 Orientator::Orientator()
 :LSM6DS3Class(Wire, 0x6A){} //LSM6DS3_ADDRESS defined in LSM6DS3.cpp
@@ -136,19 +141,20 @@ void createFileName(char* filename, DateTime now) {
   if (n<10) line += '0';
   line += String(n);
   line += ".dat";
-  line.toCharArray(filename, line.length() + 1);
-  Serial.println(filename);
+  strcpy(filename, line.c_str());
+  // Serial.print(filename);
+  // Serial.println(strlen(filename));
 }
 
 bool writeToFile(char* fileName, SecondsOn sideTimeOn) {
   File save = SD.open(fileName, (FILE_WRITE | O_TRUNC));  //override file 
   //if (save) {
-    char date[10];
+    char date[11];
     for (uint8_t i=0; i<4;i++) date[i]=fileName[i]; //create properly formated timestamp
     for (uint8_t i=5; i<7;i++) date[i]=fileName[i-1];
-    for (uint8_t i=8; i<10;i++) date[i]=fileName[i-1];
-    date[4]='-';date[7]='-';
-    save.print("header;");save.println(date);
+    for (uint8_t i=8; i<10;i++) date[i]=fileName[i-2];
+    date[4]='-'; date[7]='-'; date[10]='\0';
+    save.print("header;");save.println(date); 
     save.print("U;");save.println(sideTimeOn.up);
     save.print("D;");save.println(sideTimeOn.down);
     save.print("L;");save.println(sideTimeOn.left);
@@ -162,13 +168,11 @@ bool writeToFile(char* fileName, SecondsOn sideTimeOn) {
   return false;
 }
 
-SecondsOn readConfig(char* fileName) {
-  SecondsOn timeTmp;
+void readConfig(SecondsOn &timeTmp, char* fileName) {
   String tmp;
   tmp.reserve(80);
   
   File file = SD.open(fileName, FILE_READ);
-  Serial.println(file.name());
   while(file.available()){
     char ch = file.read();
     tmp += ch;
@@ -201,6 +205,38 @@ SecondsOn readConfig(char* fileName) {
   timeTmp.right = tempData[4].substring(2).toInt();
   timeTmp.front = tempData[5].substring(2).toInt();
   timeTmp.back  = tempData[6].substring(2).toInt();
+}
+
+bool readValuesToSend(char *values, char* fileName) {
+  File file = SD.open(fileName, FILE_READ);
+  if (!file) {
+    file.close();
+    return false; // File doesn't exist
+  }
+
+  uint8_t i=0;
+  char ch;
+  while(file.available()){
+    ch = file.read();
+    values[i++] = ch;
+  }
+  file.close();
+  values[i] = '\0';
+  return true;
+}
+
+strVec listDaysData() {
+  File root = SD.open("/");
+  strVec filenames;
+  File entry;
+  while(true) {
+    entry = root.openNextFile();
+    if (!entry) break;
+    //Serial.print(strlen(entry.name()));
+    if (strlen(entry.name()) == 12 && entry.name()[0]>='0' && entry.name()[0]<='9')
+      filenames.emplace_back(entry.name()); // getting only my data files
+  }
+  std::sort(filenames.begin(), filenames.end(), [](String a, String b) { return a > b; }); //lambda expresion, sort asc, newest in the end
   
-  return timeTmp;
+  return filenames;
 }

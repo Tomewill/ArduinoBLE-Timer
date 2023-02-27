@@ -7,6 +7,7 @@
 #include <SD.h>
 #include <DS3231.h>
 #include <Wire.h>
+#include <vector>
 
 enum CubeOrient { //on which side borad/cube is laying
   UP    = 0, //board where reset and LEDs are seen
@@ -84,7 +85,10 @@ private:
 
 void createFileName(char* filename, DateTime now); //return filename in parameter
 bool writeToFile(char* fileName, SecondsOn sideTimeOn);
-SecondsOn readConfig(char* fileName);
+void readConfig(SecondsOn &timeTmp, char* fileName);
+bool readValuesToSend(char *values, char* fileName);
+using strVec = std::vector<String>;
+strVec listDaysData();
 
 
 #endif //_TIMERLIB_H_
