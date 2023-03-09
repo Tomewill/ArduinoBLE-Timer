@@ -3,6 +3,7 @@
 #include <DS3231.h>
 #include <SPI.h>
 #include <SD.h>
+#include <string.h>
 #include "TimerLib.h"
 
 #define SPI_CS_PIN 4
@@ -12,9 +13,9 @@ BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 //changing value of led (ultimatly RGB led)
 BLEIntCharacteristic ledCharact("7c694001-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite);
 //sending raw accelerometer values
-BLECharacteristic accelCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 64);
-//sending cube orientation (0, 1, ...)
-BLEByteCharacteristic orientCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLENotify);
+BLECharacteristic dayDataCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 100);
+//instructions to properly send saved data
+BLECharacteristic instrCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite, 15);
 //sending cube orientation (UP, DOWN, ...)
 BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 10);
 //buffer for central.connected()
@@ -29,13 +30,13 @@ unsigned long previousOrientTime=0;
 SecondsOn secondsOn;
 RTClib myRTC;
 DateTime now;
-char filename[12]; // 12 chars without \0 
+char filename[13]; // 12 chars without \0 
 uint8_t actualState, previousState; //initialization in setup
 unsigned long actualTimeStamp, previousTimeStamp; 
 
 void setup() {
   Serial.begin(9600);
-  while(!Serial);
+  //while(!Serial);
   delay(200);
   Serial.println("CONFIGURATION STARTED");
   pinMode(LED_BUILTIN, OUTPUT);
@@ -49,7 +50,7 @@ void setup() {
   //initialize IMU  
   if (!MyIMU.begin()) {
     Serial.println("Failed to initialize IMU!");
-    while (1);
+    while(1);
   }
   MyIMU.readOrientation();
   actualState = MyIMU.checkOrientation();
@@ -65,11 +66,11 @@ void setup() {
   //initialize SD
   if (!SD.begin(SPI_CS_PIN)) {
     Serial.println("Failed to initialize SD!");
-    while (1);
+    while(1);
   }
   if (SD.exists(filename)) {
     Serial.println("Reading config");
-    secondsOn = readConfig(filename);
+    readConfig(secondsOn, filename);
   } else {
     Serial.println("File doesn't exist");
   }
@@ -86,8 +87,8 @@ void setup() {
 
   //add charachterics to send and recive values
   bleService.addCharacteristic(ledCharact);
-  bleService.addCharacteristic(accelCharact);
-  bleService.addCharacteristic(orientCharact);
+  bleService.addCharacteristic(dayDataCharact);
+  bleService.addCharacteristic(instrCharact);
   bleService.addCharacteristic(orientDescription);
 
   BLE.addService(bleService);
@@ -95,14 +96,15 @@ void setup() {
   //functions for connection and disconnection callbacks
   BLE.setEventHandler(BLEConnected, connectionCallback);
   BLE.setEventHandler(BLEDisconnected, disconnectionCallback);
+  //BLE.setEventHandler(BLE);
 
   //function for written value callbacks
   ledCharact.setEventHandler(BLEWritten, ledCharactWritten);
-
+  instrCharact.setEventHandler(BLEWritten, instrCharactWritten);
   //initialize starting values
   ledCharact.writeValue(0x1fcba03); //setValue deprecated
-  accelCharact.writeValue("Accel values");
-  orientCharact.writeValue(MyIMU.getPosition());
+  dayDataCharact.writeValue("Accel values");
+  instrCharact.writeValue("124;20000330");
   orientDescription.writeValue("Side");
 
   BLE.advertise();
@@ -154,23 +156,8 @@ void loop() {
   
   if (centralBuffor.connected()) {
     if (millis() - previousSendingTime > 1000UL){
-      if (accelCharact.subscribed()) {
-        String time="";
-        time.concat(secondsOn.up/1000);
-        time.concat(' ');
-        time.concat(secondsOn.down/1000);
-        time.concat(' ');
-        time.concat(secondsOn.left/1000);
-        time.concat(' ');
-        time.concat(secondsOn.right/1000);
-        time.concat(' ');
-        time.concat(secondsOn.front/1000);
-        time.concat(' ');
-        time.concat(secondsOn.back/1000);
-        accelCharact.writeValue(time.c_str());
-      }
 
-      if (orientDescription) {
+      if (orientDescription.subscribed()) {
         MyIMU.readOrientation();
         MyIMU.checkOrientation();
         String value = MyIMU.positionToEnumStr();
@@ -194,8 +181,32 @@ void disconnectionCallback (BLEDevice central) {
 
 void ledCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
   if (ledCharact.written()) {
-    Serial.println("LED written");
-    if (ledCharact.value()>0) digitalWrite(LED_BUILTIN, HIGH);
+    uint32_t val = ledCharact.value();
+    Serial.print("LED written: ");
+    Serial.println(val, HEX);
+    if (val>0) digitalWrite(LED_BUILTIN, HIGH);
     else digitalWrite(LED_BUILTIN, LOW);
   }
 }
+
+void instrCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
+  if (instrCharact.written()) {
+    //String val = (const char*)instrCharact.value();
+    Serial.print("Instruction written: ");
+    Serial.println((const char*)instrCharact.value());
+    char values[100];
+    if (strcmp((const char*)instrCharact.value(), "1900-01-01")==0) {
+      Serial.println("Sending first day");
+    }
+    if (readValuesToSend(values, (char*)instrCharact.value()))
+      dayDataCharact.writeValue(values);
+    else
+      dayDataCharact.writeValue("Empty");
+  }
+}
+
+
+
+
+
+
