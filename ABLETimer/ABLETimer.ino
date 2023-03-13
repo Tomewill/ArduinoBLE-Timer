@@ -4,6 +4,7 @@
 #include <SPI.h>
 #include <SD.h>
 #include <string.h>
+#include <algorithm>
 #include "TimerLib.h"
 
 #define SPI_CS_PIN 4
@@ -12,8 +13,8 @@ BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 
 //changing value of led (ultimatly RGB led)
 BLEIntCharacteristic ledCharact("7c694001-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite);
-//sending raw accelerometer values
-BLECharacteristic dayDataCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 100);
+//sending day times "header;day U:..." 
+BLECharacteristic dayDataCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify, 100);
 //instructions to properly send saved data
 BLECharacteristic instrCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite, 15);
 //sending cube orientation (UP, DOWN, ...)
@@ -33,6 +34,7 @@ DateTime now;
 char filename[13]; // 12 chars without \0 
 uint8_t actualState, previousState; //initialization in setup
 unsigned long actualTimeStamp, previousTimeStamp; 
+strVec filenames;
 
 void setup() {
   Serial.begin(9600);
@@ -67,6 +69,10 @@ void setup() {
   if (!SD.begin(SPI_CS_PIN)) {
     Serial.println("Failed to initialize SD!");
     while(1);
+  }
+  filenames = listDaysData();
+  for (String& file : filenames){
+    Serial.println(file);
   }
   if (SD.exists(filename)) {
     Serial.println("Reading config");
@@ -191,18 +197,26 @@ void ledCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
 
 void instrCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
   if (instrCharact.written()) {
-    //String val = (const char*)instrCharact.value();
-    Serial.print("Instruction written: ");
-    Serial.println((const char*)instrCharact.value());
+    String instr = (const char*)instrCharact.value();
+    Serial.print("-----------Instruction written: ");
+    Serial.println(instr);
     char values[100];
-    if (strcmp((const char*)instrCharact.value(), "1900-01-01")==0) {
+    if (instr.equals("20000101.DAT")) {
       Serial.println("Sending first day");
-    }
-    if (readValuesToSend(values, (char*)instrCharact.value()))
+      readValuesToSend(values, (char*)filenames.back().c_str());
+      Serial.println(filenames.back());
       dayDataCharact.writeValue(values);
-    else
-      dayDataCharact.writeValue("Empty");
-  }
+    } else if (std::find(filenames.begin(), filenames.end(), instr) != filenames.end()) {
+      Serial.print("Sending day: ");
+      Serial.println(instr);
+      if (readValuesToSend(values, (char*)instr.c_str()))
+        dayDataCharact.writeValue(values);
+    } else {
+      Serial.println("Sending empty");
+      dayDataCharact.writeValue("Empty,nowork");
+    }
+    Serial.println("-----------Instruction done!");
+  }  
 }
 
 
