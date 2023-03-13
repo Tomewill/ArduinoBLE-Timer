@@ -1,10 +1,13 @@
 #include "TimerLib.h"
 #include <Arduino.h>
 #include <string.h>
+<<<<<<< HEAD
 #include <vector>
 #include <algorithm>
 
 using strVec = std::vector<String>;
+=======
+>>>>>>> 6a0d036925f4626ed9f5ed8413b14f958f80689d
 
 Orientator::Orientator()
 :LSM6DS3Class(Wire, 0x6A){} //LSM6DS3_ADDRESS defined in LSM6DS3.cpp
@@ -141,9 +144,15 @@ void createFileName(char* filename, DateTime now) {
   if (n<10) line += '0';
   line += String(n);
   line += ".dat";
+<<<<<<< HEAD
   strcpy(filename, line.c_str());
   // Serial.print(filename);
   // Serial.println(strlen(filename));
+=======
+  //line.toCharArray(filename, line.length() + 1);
+  strcpy(filename, line.c_str());
+  Serial.println(filename);
+>>>>>>> 6a0d036925f4626ed9f5ed8413b14f958f80689d
 }
 
 bool writeToFile(char* fileName, SecondsOn sideTimeOn) {
@@ -224,6 +233,7 @@ bool readValuesToSend(char *values, char* fileName) {
   values[i] = '\0';
   return true;
 }
+<<<<<<< HEAD
 
 strVec listDaysData() {
   File root = SD.open("/");
@@ -240,3 +250,5 @@ strVec listDaysData() {
   
   return filenames;
 }
+=======
+>>>>>>> 6a0d036925f4626ed9f5ed8413b14f958f80689d

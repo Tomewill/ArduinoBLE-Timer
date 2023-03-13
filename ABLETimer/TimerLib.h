@@ -87,8 +87,11 @@ void createFileName(char* filename, DateTime now); //return filename in paramete
 bool writeToFile(char* fileName, SecondsOn sideTimeOn);
 void readConfig(SecondsOn &timeTmp, char* fileName);
 bool readValuesToSend(char *values, char* fileName);
+<<<<<<< HEAD
 using strVec = std::vector<String>;
 strVec listDaysData();
+=======
+>>>>>>> 6a0d036925f4626ed9f5ed8413b14f958f80689d
 
 
 #endif //_TIMERLIB_H_
