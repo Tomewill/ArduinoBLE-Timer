@@ -9,6 +9,10 @@
 #include <Wire.h>
 #include <vector>
 
+#ifdef __AVR__
+  #include <avr/power.h> // Required for 16 MHz Adafruit Trinket
+#endif // __AVR__
+
 enum CubeOrient { //on which side borad/cube is laying
   UP    = 0, //board where reset and LEDs are seen
   DOWN  = 1,
@@ -69,19 +73,9 @@ private:
   uint8_t position;
 };
 
-class ColorSystem {
-public:
-  ColorSystem(uint8_t, uint8_t);
-  // void HSVtoRGB;
-  // void RGBtoHSV;
-  Adafruit_NeoPixel pixels;
-
-private:
-  uint8_t redVal, greenVal, blueVal;
-  unsigned long speedInterval;
-  unsigned long lastSpeedTime;
-
-};
+// void setColors(Adafruit_NeoPixel pixels, uint32_t color);
+// void turnOff(Adafruit_NeoPixel pixels);
+// void pingLowBatt(Adafruit_NeoPixel pixels, long _delay, uint8_t n);
 
 void createFileName(char* filename, DateTime now); //return filename in parameter
 bool writeToFile(char* fileName, SecondsOn sideTimeOn);

@@ -1,5 +1,6 @@
 #include "TimerLib.h"
 #include <Arduino.h>
+#include <Adafruit_NeoPixel.h>
 #include <string.h>
 #include <vector>
 #include <algorithm>
@@ -126,9 +127,28 @@ String Orientator::positionToEnumStr() {
   }
 }
 
-ColorSystem::ColorSystem(uint8_t pin, uint8_t numpixels){
-  
-}
+
+// void setColors(Adafruit_NeoPixel pixels, uint32_t color, uint8_t numLEDs) {
+//   for (uint8_t i=0; i<numLEDs; i++)
+//     pixels.setPixelColor(i, (color | 0xff << 24)); // max white color
+//   pixels.show();
+// }
+
+// void turnOff(Adafruit_NeoPixel pixels) {
+//   pixels.clear();
+//   pixels.show();
+// }
+
+// void pingLowBatt(Adafruit_NeoPixel pixels, long _delay, uint8_t n) {
+//   for (uint8_t i=0; i<n; i++) {
+//     setColors(pixels, 0x0000ff, numLEDs);
+//     delay(_delay);
+//     turnOff(pixels);
+//     delay(_delay);
+//   }
+//   setColors(pixels, 0xff0000, numLEDs);
+// }
+
 
 void createFileName(char* filename, DateTime now) {
   String line;
@@ -223,6 +243,7 @@ bool readValuesToSend(char *values, char* fileName) {
   file.close();
   values[i] = '\0';
   return true;
+  String dupa="dupa";
 }
 
 strVec listDaysData() {

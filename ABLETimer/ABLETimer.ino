@@ -7,11 +7,17 @@
 #include <algorithm>
 #include "TimerLib.h"
 
-#define SPI_CS_PIN 4
+#define SPI_CS_PIN 3
+#define PIN_NEO_PIXEL 2 
+#define NUM_PIXELS 8 
+#define PIN_BATTERY A0
 
-BLEService bleService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
+BLEService cubeService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
+BLEService batteryService("180F");
 
-//changing value of led (ultimatly RGB led)
+BLEUnsignedCharCharacteristic batteryCharact("2A19", BLERead | BLENotify); 
+
+//changing value of RGB led)
 BLEIntCharacteristic ledCharact("7c694001-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite);
 //sending day times "header;day U:..." 
 BLECharacteristic dayDataCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify, 100);
@@ -33,12 +39,19 @@ RTClib myRTC;
 DateTime now;
 char filename[13]; // 12 chars without \0 
 uint8_t actualState, previousState; //initialization in setup
-unsigned long actualTimeStamp, previousTimeStamp; 
+unsigned long actualTimeStamp, previousTimeStamp;
+uint16_t batteryOld=0;
+void updateBattery();
+
+Adafruit_NeoPixel pixels(NUM_PIXELS, PIN_NEO_PIXEL, NEO_GRB + NEO_KHZ800);
+
+
+using strVec = std::vector<String>;
 strVec filenames;
 
 void setup() {
   Serial.begin(9600);
-  //while(!Serial);
+  // while(!Serial);
   delay(200);
   Serial.println("CONFIGURATION STARTED");
   pinMode(LED_BUILTIN, OUTPUT);
@@ -58,7 +71,7 @@ void setup() {
   actualState = MyIMU.checkOrientation();
   previousState = -1;
 
-  //initalize RTC
+  //initalize RTC and file
   Wire.begin();
   now = myRTC.now();
   createFileName(filename, now); //filename modified in parameter
@@ -86,18 +99,24 @@ void setup() {
   Serial.println(secondsOn.right);
   Serial.println(secondsOn.front);
   Serial.println(secondsOn.back);
+
+  //initialize LEDs
+  pixels.begin();
+  setColors(0x0000ff);
   
   //set uuid to connect and name diplayed in bluetooth pairing 
   BLE.setLocalName("Cube timer");
-  BLE.setAdvertisedService(bleService);
+  BLE.setAdvertisedService(cubeService);
 
   //add charachterics to send and recive values
-  bleService.addCharacteristic(ledCharact);
-  bleService.addCharacteristic(dayDataCharact);
-  bleService.addCharacteristic(instrCharact);
-  bleService.addCharacteristic(orientDescription);
-
-  BLE.addService(bleService);
+  cubeService.addCharacteristic(ledCharact);
+  cubeService.addCharacteristic(dayDataCharact);
+  cubeService.addCharacteristic(instrCharact);
+  cubeService.addCharacteristic(orientDescription);
+  BLE.addService(cubeService);
+  
+  batteryService.addCharacteristic(batteryCharact);
+  BLE.addService(batteryService);
 
   //functions for connection and disconnection callbacks
   BLE.setEventHandler(BLEConnected, connectionCallback);
@@ -108,18 +127,18 @@ void setup() {
   ledCharact.setEventHandler(BLEWritten, ledCharactWritten);
   instrCharact.setEventHandler(BLEWritten, instrCharactWritten);
   //initialize starting values
-  ledCharact.writeValue(0x1fcba03); //setValue deprecated
+  ledCharact.writeValue(0x0000ff); //blue color to connect
   dayDataCharact.writeValue("Accel values");
   instrCharact.writeValue("124;20000330");
   orientDescription.writeValue("Side");
+  batteryCharact.writeValue(batteryOld);
 
   BLE.advertise();
-
   Serial.println("CONFIGURATION COMPLITED");
 }
 
-
 void loop() {
+
   BLE.poll();
 
   //counting time
@@ -159,9 +178,9 @@ void loop() {
     previousOrientTime = millis();
   }
 
-  
+  //BLE operations
   if (centralBuffor.connected()) {
-    if (millis() - previousSendingTime > 1000UL){
+    if (millis() - previousSendingTime > 3000UL){
 
       if (orientDescription.subscribed()) {
         MyIMU.readOrientation();
@@ -170,6 +189,7 @@ void loop() {
         Serial.println(value);
         orientDescription.writeValue(value.c_str());
       }
+      updateBattery();
       previousSendingTime = millis();
     }
   }
@@ -177,21 +197,25 @@ void loop() {
 
 void connectionCallback (BLEDevice central) {
   centralBuffor = central;
+  ledCharact.writeValue(0x00ff00);
+  setColors(0x00ff00);
   Serial.println("Connected");
 }
 
 void disconnectionCallback (BLEDevice central) {
+  setColors(0xff0000);
   Serial.println("Disconnected");
-  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+  setColors(0x0000ff);
 }
 
 void ledCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
   if (ledCharact.written()) {
     uint32_t val = ledCharact.value();
+    if ((val>>24 & 0xff) > 0) setColors(val);
+    else turnOff();
     Serial.print("LED written: ");
     Serial.println(val, HEX);
-    if (val>0) digitalWrite(LED_BUILTIN, HIGH);
-    else digitalWrite(LED_BUILTIN, LOW);
   }
 }
 
@@ -219,8 +243,38 @@ void instrCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
   }  
 }
 
+void updateBattery() {
+  int battery=analogRead(A0);
+  static const int batteryMin=0, batteryMax=1023;
+  battery=map(battery, batteryMin, batteryMax, 0, 100);
 
+  if (battery != batteryOld) {      
+    Serial.print("Battery in %: ");
+    Serial.println(battery);
+    batteryCharact.writeValue(battery);
+    batteryOld=battery;
+  }
+}
 
+void setColors(uint32_t color) {
+  for (uint8_t i=0; i<NUM_PIXELS; i++)
+    pixels.setPixelColor(i, (color | 0xff << 24)); // max white color
+  pixels.show();
+}
 
+void turnOff() {
+  pixels.clear();
+  pixels.show();
+}
+
+void pingLowBatt(long _delay, uint8_t n) {
+  for (uint8_t i=0; i<n; i++) {
+    setColors(0xff0000);
+    delay(_delay);
+    turnOff();
+    delay(_delay);
+  }
+  setColors(0xff0000);
+}
 
 
