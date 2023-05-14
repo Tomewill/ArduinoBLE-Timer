@@ -24,7 +24,7 @@ BLECharacteristic dayDataCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLERead
 //instructions to properly send saved data
 BLECharacteristic instrCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite, 15);
 //sending cube orientation (UP, DOWN, ...)
-BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 10);
+BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 20);
 //buffer for central.connected()
 BLEDevice centralBuffor; 
 //IMU definition of herited class LSM6DS3Class
@@ -179,8 +179,8 @@ void loop() {
   }
 
   //BLE operations
-  if (centralBuffor.connected()) {
-    if (millis() - previousSendingTime > 3000UL){
+  if (millis() - previousSendingTime > 1000UL) {
+    if (centralBuffor.connected()) {
 
       if (orientDescription.subscribed()) {
         MyIMU.readOrientation();
