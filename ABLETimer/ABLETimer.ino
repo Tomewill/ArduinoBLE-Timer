@@ -10,7 +10,7 @@
 #define SPI_CS_PIN 3
 #define PIN_NEO_PIXEL 2 
 #define NUM_PIXELS 8 
-#define PIN_BATTERY A0
+#define PIN_BATTERY A1
 
 BLEService cubeService("7c694000-268a-46e3-99f8-04ebc1fb81a4");
 BLEService batteryService("180F");
@@ -24,7 +24,7 @@ BLECharacteristic dayDataCharact("7c694002-268a-46e3-99f8-04ebc1fb81a4", BLERead
 //instructions to properly send saved data
 BLECharacteristic instrCharact("7c694003-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLEWrite, 15);
 //sending cube orientation (UP, DOWN, ...)
-BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLENotify, 20);
+BLECharacteristic orientDescription("7c694004-268a-46e3-99f8-04ebc1fb81a4", BLERead | BLENotify, 10);
 //buffer for central.connected()
 BLEDevice centralBuffor; 
 //IMU definition of herited class LSM6DS3Class
@@ -33,12 +33,14 @@ Orientator MyIMU;
 //buffers for deltas
 unsigned long previousSendingTime=0;
 unsigned long previousOrientTime=0;
+unsigned long previousSavingTime=300000;
 
 SecondsOn secondsOn;
 RTClib myRTC;
 DateTime now;
 char filename[13]; // 12 chars without \0 
 uint8_t actualState, previousState; //initialization in setup
+String value;
 unsigned long actualTimeStamp, previousTimeStamp;
 uint16_t batteryOld=0;
 void updateBattery();
@@ -130,7 +132,10 @@ void setup() {
   ledCharact.writeValue(0x0000ff); //blue color to connect
   dayDataCharact.writeValue("Accel values");
   instrCharact.writeValue("124;20000330");
-  orientDescription.writeValue("Side");
+  MyIMU.checkOrientation();
+  value = MyIMU.positionToEnumStr();
+  orientDescription.writeValue(value.c_str());
+  Serial.println("Side: "+value);
   batteryCharact.writeValue(batteryOld);
 
   BLE.advertise();
@@ -145,7 +150,13 @@ void loop() {
   if (millis() - previousOrientTime > 500UL) {
     MyIMU.readOrientation();
     actualState = MyIMU.checkOrientation();
-    if (actualState != UNDEFINED && actualState != previousState) {
+    value = MyIMU.positionToEnumStr();
+    if ((actualState != UNDEFINED && actualState != previousState) || (millis() - previousSavingTime > 300000UL)) { //write to file after changing side or when passed 5 mins
+
+      if (centralBuffor.connected() && orientDescription.subscribed()) { //send side when its changed
+        Serial.println(value);
+        orientDescription.writeValue(value.c_str());
+      }
       now = myRTC.now();
       actualTimeStamp = now.unixtime();
       unsigned long delta = actualTimeStamp - previousTimeStamp;
@@ -173,22 +184,15 @@ void loop() {
         Serial.println("Wrote to file succesfully");
       } else Serial.println("Failed to write to file");
       previousTimeStamp = actualTimeStamp;
-      previousState = actualState; //write to file after changing side
+      previousState = actualState; 
+      previousSavingTime = millis();
     }
     previousOrientTime = millis();
   }
 
   //BLE operations
-  if (millis() - previousSendingTime > 1000UL) {
-    if (centralBuffor.connected()) {
-
-      if (orientDescription.subscribed()) {
-        MyIMU.readOrientation();
-        MyIMU.checkOrientation();
-        String value = MyIMU.positionToEnumStr();
-        Serial.println(value);
-        orientDescription.writeValue(value.c_str());
-      }
+  if (centralBuffor.connected()) {
+    if (millis() - previousSendingTime > 1000UL){
       updateBattery();
       previousSendingTime = millis();
     }
@@ -200,6 +204,7 @@ void connectionCallback (BLEDevice central) {
   ledCharact.writeValue(0x00ff00);
   setColors(0x00ff00);
   Serial.println("Connected");
+  updateBattery();
 }
 
 void disconnectionCallback (BLEDevice central) {
@@ -244,13 +249,15 @@ void instrCharactWritten (BLEDevice central, BLECharacteristic characteristic) {
 }
 
 void updateBattery() {
-  int battery=analogRead(A0);
-  static const int batteryMin=0, batteryMax=1023;
-  battery=map(battery, batteryMin, batteryMax, 0, 100);
+  int battery=analogRead(PIN_BATTERY);
+  static const int batteryMin=484, batteryMax=637;
+  int batteryPerC=map(battery, batteryMin, batteryMax, 0, 100);
 
   if (battery != batteryOld) {      
-    Serial.print("Battery in %: ");
+    Serial.print("Battery: ");
     Serial.println(battery);
+    Serial.print("Battery in %: ");
+    Serial.println(batteryPerC);
     batteryCharact.writeValue(battery);
     batteryOld=battery;
   }
